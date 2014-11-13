@@ -7,7 +7,6 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "SCCaptureManager.h"
 
 @class SCCameraViewController;
 
@@ -27,8 +26,6 @@
 /*
  Sets initial capture type to start with for the controller
  */
-- (id) initWithCaptureType:(SCCaptureType)captureType;
-
-- (SCCaptureType) currentCaptureType;
+- (instancetype) initWithCaptureType:(SBCaptureType)captureType;
 
 @end

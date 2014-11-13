@@ -7,7 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "SCPhotoManager.h"
+#import "SBPhotoManager.h"
 #import "SCCaptureManager.h"
 
 @import AVFoundation.AVCaptureDevice;

@@ -7,7 +7,6 @@
 //
 
 #import "SCCameraViewController.h"
-#import "SCCaptureManager.h"
 #import "SCCaptureView.h"
 #import "SCReviewController.h"
 #import "SCImagePickerController.h"
@@ -18,28 +17,23 @@
 #import "SCRecordButton.h"
 #import "SCAlbumViewController.h"
 #import "UIColor+FanClub.h"
+#import "SBVideoManager.h"
+#import "SBPhotoManager.h"
+#import "SBCaptureManager.h"
 
 #import <PureLayout/PureLayout.h>
 #import <ReactiveCocoa/ReactiveCocoa.h>
 
-@interface SCCameraViewController () <UIActionSheetDelegate, SCPhotoManagerDelegate, SCProgressBarDelegate, SCRecordButtonDelegate, SCReviewControllerDelegate>
+@interface SCCameraViewController () <UIActionSheetDelegate, SCProgressBarDelegate, SCRecordButtonDelegate, SCReviewControllerDelegate>
 
-@property (nonatomic, assign) BOOL recording;
 @property (nonatomic, weak) SCCaptureManager *captureManager;
 @property (nonatomic, strong) SCCameraView *cameraView;
+
+@property (nonatomic, readonly) SBCaptureManager *captureManager;
 
 @end
 
 @implementation SCCameraViewController
-
-- (SCCaptureManager*) captureManager {
-    if (!_captureManager) {
-        _captureManager = [SCCaptureManager sharedInstance];
-        _captureManager.photoManager.delegate = self;
-        _captureManager.videoManager.maximumStitchCount = 1;
-    }
-    return _captureManager;
-}
 
 - (SCCameraView*) cameraView {
     if (!_cameraView) {
@@ -57,21 +51,30 @@
     return _cameraView;
 }
 
-- (SCCaptureType) currentCaptureType {
-    return self.captureManager.captureType;
-}
-
-- (id) initWithCaptureType:(SCCaptureType)captureType {
+- (instancetype) initWithCaptureType:(SBCaptureType)captureType {
     if (self = [super init]) {
-        self.captureManager.captureType = captureType;
+        self.captureType = captureType;
     }
     return self;
+}
+
+
+#pragma mark - SCPhotoManager Delegate
+
+-(void)photoManager:(SBPhotoManager*)manager capturedImage:(UIImage*)image {
+    self.cameraView.stateToolbar.hidden = YES;
+    if (image) {
+        SCReviewController *vc = [[SCReviewController alloc] initWithImage:image];
+        vc.delegate = self;
+        [self.navigationController pushViewController:vc animated:YES];
+    }
 }
 
 #pragma mark - View state
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+    
     
     [self.navigationController setNavigationBarHidden:YES animated:YES];
 
@@ -293,7 +296,6 @@
     AVCaptureFlashMode mode = [self.cameraView cycleFlashMode];
     [self updateFlashMode:mode];
 }
-
 -(void)cameraToggleButtonPressed:(UIButton *)sender {
     [self switchCamera];
 }
@@ -301,25 +303,17 @@
 -(void)handleDoubleTap:(UITapGestureRecognizer *)tapRecognizer {
 //    [self switchCamera];
 }
-
 -(void)handleSingleTap:(UITapGestureRecognizer *)tapRecognizer {
     //focus here
 }
-
 - (void) handleSwipeLeftGesture:(UISwipeGestureRecognizer*) swipeGesture {
-    if (self.cameraView.progressBar.timeElapsed > 0) {
-        return;
-    }
-
+    if (self.cameraView.progressBar.timeElapsed > 0) return;
     if (self.cameraView.pageView.index + 1 <= self.cameraView.pageView.labels.count-1)
         self.cameraView.pageView.index++;
 }
 
 - (void) handleSwipeRightGesture:(UISwipeGestureRecognizer*)swipeGesture {
-    if (self.cameraView.progressBar.timeElapsed > 0) {
-        return;
-    }
-
+    if (self.cameraView.progressBar.timeElapsed > 0) return;
     if (self.cameraView.pageView.index - 1 >= 0)
         self.cameraView.pageView.index--;
 }
@@ -330,28 +324,11 @@
     }
 }
 
--(void)aspectRatioButtonPressed:(id)sender {
-    [self.cameraView cycleAspectRatio];
-//    self.captureManager.photoManager.aspectRatioDefault = !self.captureManager.photoManager.aspectRatioDefault;
-}
-
 #pragma mark - UIGestureRecognizerDelegate
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
     if (touch.view == self.cameraView.recordButton)
         return NO;
     return YES;
-}
-
-
-#pragma mark - SCPhotoManager Delegate
-
--(void)photoManager:(SCPhotoManager*)manager capturedImage:(UIImage*)image {
-    self.cameraView.stateToolbar.hidden = YES;
-    if (image) {
-        SCReviewController *vc = [[SCReviewController alloc] initWithImage:image];
-        vc.delegate = self;
-        [self.navigationController pushViewController:vc animated:YES];
-    }
 }
 
 #pragma mark - SCProgressBarDelegate

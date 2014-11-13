@@ -6,11 +6,11 @@
 //  Copyright (c) 2014 David Skuza. All rights reserved.
 //
 
-#import "SCVideoManager.h"
+#import "SBVideoManager.h"
 #import "SBMovieWriter.h"
 #import <ReactiveCocoa/RACEXTScope.h>
 
-@interface SCVideoManager () <AVCaptureFileOutputRecordingDelegate>
+@interface SBVideoManager () <AVCaptureFileOutputRecordingDelegate>
 
 @property (nonatomic, readonly) NSDictionary *sizesForSessionPreset;
 @property (nonatomic, readonly) CGSize videoSize;
@@ -19,9 +19,9 @@
 
 @end
 
-@implementation SCVideoManager
+@implementation SBVideoManager
 
-@synthesize videoSize = _videoSize, assetLibrary = _assetLibrary;
+@synthesize videoSize = _videoSize, assetLibrary = _assetLibrary, camera = _camera;
 
 - (ALAssetsLibrary*) assetLibrary {
     if (!_assetLibrary)
@@ -29,42 +29,45 @@
     return _assetLibrary;
 }
 
-- (void) setVideoCamera:(GPUImageVideoCamera *)videoCamera movieWriter:(SBMovieWriter*)writer {
-    if (_videoCamera == videoCamera && _movieWriter == writer)
+- (GPUImageVideoCamera*) camera {
+    return _camera;
+}
+
+- (void) setCamera:(GPUImageVideoCamera *)videoCamera movieWriter:(SBMovieWriter*)writer {
+    if (_camera == videoCamera && _movieWriter == writer)
         return; //do nothing
     
-    [_videoCamera stopCameraCapture];
-    GPUImageView *imageView = [self.delegate videoManagerNeedsGPUImageView:self];
-    [_videoCamera removeTarget:imageView];
-    [_videoCamera removeTarget:_movieWriter];
-    if (_videoCamera != videoCamera) {
-        [self willChangeValueForKey:@"videoCamera"];
-        _videoCamera = videoCamera;
-        [self didChangeValueForKey:@"videoCamera"];
+    [_camera stopCameraCapture];
+    [_camera removeTarget:self.imageView];
+    [_camera removeTarget:_movieWriter];
+    if (_camera != videoCamera) {
+        [self willChangeValueForKey:@"camera"];
+        _camera = videoCamera;
+        [self didChangeValueForKey:@"camera"];
     }
     if (_movieWriter != writer) {
         [self willChangeValueForKey:@"movieWriter"];
         _movieWriter = writer;
         [self didChangeValueForKey:@"movieWriter"];
     }
-    [_videoCamera addTarget:_movieWriter];
-    [_videoCamera addTarget:imageView];
-    [_videoCamera startCameraCapture];
-    _videoCamera.audioEncodingTarget = _movieWriter;
+    [_camera addTarget:_movieWriter];
+    [_camera addTarget:self.imageView];
+    [_camera startCameraCapture];
+    _camera.audioEncodingTarget = _movieWriter;
 }
 
-- (void) setVideoCamera:(GPUImageVideoCamera *)videoCamera {
-    [self setVideoCamera:videoCamera movieWriter:self.movieWriter];
+- (void) setCamera:(GPUImageVideoCamera*)camera {
+    [self setCamera:camera movieWriter:self.movieWriter];
 }
 - (void) setMovieWriter:(SBMovieWriter *)movieWriter {
-    [self setVideoCamera:self.videoCamera movieWriter:movieWriter];
+    [self setCamera:self.camera movieWriter:movieWriter];
 }
 
 - (void) setCaptureSessionPreset:(NSString *)captureSessionPreset {
     [self willChangeValueForKey:@"captureSessionPreset"];
     _captureSessionPreset = [captureSessionPreset copy];
     [self didChangeValueForKey:@"captureSessionPreset"];
-    self.videoCamera.captureSessionPreset = captureSessionPreset;
+    self.camera.captureSessionPreset = captureSessionPreset;
     
     //adjust video size (if needed)
     CGSize newVideoSize = [((NSValue*)[self.sizesForSessionPreset objectForKey:captureSessionPreset]) CGSizeValue];
@@ -83,47 +86,41 @@
     _capturePosition = capturePosition;
     [self didChangeValueForKey:@"capturePosition"];
 
-    self.videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:_capturePosition];
+    self.camera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:_capturePosition];
 }
 
 - (void) loadBestCaptureSessionPreset {
-    if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
+    if ([self.camera.captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
         self.captureSessionPreset = AVCaptureSessionPreset1920x1080;
-    } else if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
+    } else if ([self.camera.captureSession canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
         self.captureSessionPreset = AVCaptureSessionPreset1280x720;
-    } else if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
+    } else if ([self.camera.captureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
         self.captureSessionPreset = AVCaptureSessionPreset640x480;
-    } else if ([self.videoCamera .captureSession canSetSessionPreset:AVCaptureSessionPreset352x288]) {
+    } else if ([self.camera .captureSession canSetSessionPreset:AVCaptureSessionPreset352x288]) {
         self.captureSessionPreset = AVCaptureSessionPreset352x288;
     } else {
         NSLog(@"Cannot set any session preset");
     }
 }
 
-- (id)initWithMovieOutputURL:(NSURL*)ouputURL delegate:(id<SCVideManagerDelegate>)delegate {
-    if (self = [super init]) {
+- (instancetype) initWithImageView:(GPUImageView *)imageView outputURL:(NSURL*)url {
+    if (self = [super initWithImageView:imageView]) {
         _sizesForSessionPreset = @{AVCaptureSessionPreset1920x1080 : [NSValue valueWithCGSize:CGSizeMake(1920, 1080)],
                                    AVCaptureSessionPreset1280x720 : [NSValue valueWithCGSize:CGSizeMake(1280, 720)],
                                    AVCaptureSessionPreset640x480 : [NSValue valueWithCGSize:CGSizeMake(640, 480)],
                                    AVCaptureSessionPreset352x288 : [NSValue valueWithCGSize:CGSizeMake(352, 288)]};
-        _delegate = delegate;
         _captureSessionPreset = AVCaptureSessionPresetHigh;
-        _ouputURL = [ouputURL copy];
-        _videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:AVCaptureDevicePositionBack];
+        _ouputURL = [url copy];
+        _camera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:AVCaptureDevicePositionBack];
         [self loadBestCaptureSessionPreset];
-        
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(orientationChange:)
-                                                     name:UIApplicationDidChangeStatusBarOrientationNotification
-                                                   object:nil];
     }
     return self;
 }
 
 - (void)startRecording {
     //add targets if they don't exist already
-    if (!self.videoCamera.audioEncodingTarget)
-        self.videoCamera.audioEncodingTarget = self.movieWriter;
+    if (!self.camera.audioEncodingTarget)
+        self.camera.audioEncodingTarget = self.movieWriter;
     
     //resumes recording
     if (self.movieWriter.isPaused) {
@@ -148,7 +145,7 @@
     @weakify(self);
     [self.movieWriter finishRecordingWithCompletionHandler:^{
         @strongify(self);
-        self.videoCamera.audioEncodingTarget = nil;
+        self.camera.audioEncodingTarget = nil;
         if (completion)
             completion(self.ouputURL);
     }];
@@ -156,30 +153,6 @@
 
 - (void) saveVideoAtPath:(NSURL*)path toLibraryWithCompletion:(ALAssetsLibraryWriteVideoCompletionBlock)completion {
     [self.assetLibrary writeVideoAtPathToSavedPhotosAlbum:path completionBlock:completion];
-}
-
-#pragma mark - Orientation Change
-- (void)orientationChange:(NSNotification *)notificacion {
-    UIInterfaceOrientation toOrientation = [[[notificacion userInfo]
-                                             objectForKey:UIApplicationStatusBarOrientationUserInfoKey] integerValue];
-    switch (toOrientation) {
-        case UIDeviceOrientationLandscapeLeft:
-            self.videoCamera.outputImageOrientation = UIInterfaceOrientationLandscapeLeft;
-            break;
-            
-        case UIDeviceOrientationLandscapeRight:
-            self.videoCamera.outputImageOrientation = UIInterfaceOrientationLandscapeRight;
-            break;
-            
-        case UIDeviceOrientationPortrait:
-            self.videoCamera.outputImageOrientation = UIInterfaceOrientationPortrait;
-            break;
-            
-        case UIDeviceOrientationPortraitUpsideDown:
-            self.videoCamera.outputImageOrientation = UIInterfaceOrientationPortraitUpsideDown;
-            break;
-        default: break; //stay the same
-    }
 }
 
 @end

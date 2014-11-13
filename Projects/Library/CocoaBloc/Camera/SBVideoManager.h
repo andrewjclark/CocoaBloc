@@ -6,21 +6,12 @@
 //  Copyright (c) 2014 David Skuza. All rights reserved.
 //
 
-#import "SCDeviceManager.h"
-#import "SCCapturing.h"
+#import "SBDeviceManager.h"
 #import <GPUImage/GPUImage.h>
 
-@class SBMovieWriter, SCVideoManager;
+@class SBMovieWriter, SBVideoManager;
 
-@protocol SCVideManagerDelegate <NSObject>
-- (GPUImageView*) videoManagerNeedsGPUImageView:(SCVideoManager*)manager;
-@end
-
-@interface SCVideoManager : NSObject <SCCapturing>
-
-@property (nonatomic, weak) id<SCVideManagerDelegate> delegate;
-
-@property (nonatomic, strong, readonly) GPUImageVideoCamera *videoCamera;
+@interface SBVideoManager : SBDeviceManager
 
 @property (nonatomic, strong, readonly) SBMovieWriter *movieWriter;
 
@@ -37,7 +28,7 @@
  */
 @property (nonatomic, assign) CMTime maxVideoDuration;
 
-- (id)initWithMovieOutputURL:(NSURL*)ouputURL delegate:(id<SCVideManagerDelegate>)delegate;
+- (instancetype) initWithImageView:(GPUImageView *)imageView outputURL:(NSURL*)outputURL;
 
 /**
 * Starts an output session
