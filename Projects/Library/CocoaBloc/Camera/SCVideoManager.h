@@ -8,63 +8,28 @@
 
 #import "SCDeviceManager.h"
 #import "SCCapturing.h"
+#import <GPUImage/GPUImage.h>
 
-@interface SCVideoManager : SCDeviceManager <SCCapturing>
-/**
- * Video output
- */
-@property (nonatomic, strong) AVCaptureMovieFileOutput *output;
+@class SBMovieWriter, SCVideoManager;
 
-/**
- * Mic input
- */
-@property (nonatomic, strong) AVCaptureDeviceInput *micInput;
+@protocol SCVideManagerDelegate <NSObject>
+- (GPUImageView*) videoManagerNeedsGPUImageView:(SCVideoManager*)manager;
+@end
 
-/**
- * Returns an instance of AVCaptureDevice instantiated for the microphone
- */
-@property (nonatomic, readonly) AVCaptureDevice *microphone;
-/**
- * The current torch mode used by the current camera
- */
-@property (nonatomic, assign) AVCaptureTorchMode torchMode;
-/**
- * Checks for whether or not the torch is available by the current device
- */
-@property (nonatomic, readonly) BOOL isTorchAvailable;
-/**
- * Checks whether the torch is active and whether it will be on during video recording
- */
-@property (nonatomic, readonly) BOOL isTorchActive;
-/**
- * Checks whether or not a specific torh mode is available
- */
-- (BOOL)isTorchModeSupported:(AVCaptureTorchMode)torchMode;
-/**
- * Sets whether or not to record audio
- */
-@property (nonatomic, assign) BOOL shouldRecordAudio;
-/**
- * If we overflow the stitch count, reset back to 0 and set the current session as the first recording
- */
-@property (nonatomic, assign) BOOL resetsOnOverflow;
-/*
- * The FPS of the video recording
- */
-@property (nonatomic, assign) CMTime FPS;
-/**
- * Whether to stitch videos together or not
- */
-@property (nonatomic, assign) BOOL shouldStitchVideo;
-/**
- * The amount of videos to stitch together.
- * Set 0 for unlimited.
- */
-@property (nonatomic, assign) NSUInteger maximumStitchCount;
-/**
- * Returns the current number of videos being stitched together
- */
-@property (nonatomic, readonly) NSUInteger currentStitchCount;
+@interface SCVideoManager : NSObject <SCCapturing>
+
+@property (nonatomic, weak) id<SCVideManagerDelegate> delegate;
+
+@property (nonatomic, strong, readonly) GPUImageVideoCamera *videoCamera;
+
+@property (nonatomic, strong, readonly) SBMovieWriter *movieWriter;
+
+@property (nonatomic, copy, readonly) NSURL *ouputURL;
+
+@property (nonatomic, copy) NSString *captureSessionPreset;
+
+@property (nonatomic, assign) AVCaptureDevicePosition capturePosition;
+
 /**
  * Maximum duration to record video.
  * If shouldStitchVideo, this will be the total duration of all stitches combined
@@ -72,30 +37,23 @@
  */
 @property (nonatomic, assign) CMTime maxVideoDuration;
 
-/**
- * Called when the camera output has been processed (useful for saving locally).
- */
-@property (nonatomic, copy) void (^captureOutputFinishedProcessing)(AVCaptureFileOutput *output, NSURL* fileURL, NSArray *connections, NSError *error);
+- (id)initWithMovieOutputURL:(NSURL*)ouputURL delegate:(id<SCVideManagerDelegate>)delegate;
 
-/**
- * Resets the total stitchings to 0 and deletes all previously recorded stitches
- */
-- (void)resetRecordings;
 /**
 * Starts an output session
 */
-- (BOOL)startCapture;
+- (void)startRecording;
 /**
  * Stops an output session
 */
-- (void)stopCapture;
+- (void)stopRecording;
+- (void)stopRecordingWithCompletion:(void (^)(NSURL *fileURL))completion;
 
 /**
  * Save's video locally
+ @param path - the video file path where your video lives (i.e. most likely the @ouputURL property)
  @param completion - [async] called when attempting local save
- @return NO if cannot save locally (stiches == 0)
- @return YES if can save locally (stiches > 0)
  */
-- (BOOL) saveVideoLocally:(void (^)(NSURL *assetURL, NSError *error))completion;
+- (void) saveVideoAtPath:(NSURL*)path toLibraryWithCompletion:(ALAssetsLibraryWriteVideoCompletionBlock)completion;
 
 @end

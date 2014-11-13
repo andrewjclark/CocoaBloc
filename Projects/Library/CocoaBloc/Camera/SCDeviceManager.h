@@ -10,11 +10,6 @@
  * SCDeviceManager manages the specific devices and their settings related to capturing photo or video
  */
 
-typedef NS_ENUM(NSUInteger, SCCameraType) {
-    SCCameraTypeFrontFacing,
-    SCCameraTypeRear
-};
-
 #import <Foundation/Foundation.h>
 @import AVFoundation;
 @import AssetsLibrary;
@@ -47,10 +42,6 @@ typedef NS_ENUM(NSUInteger, SCCameraType) {
  * The total number of cameras on the device
  */
 @property (nonatomic, readonly) NSUInteger numberOfAvailableCameras;
-/**
- * The current type of camera being used
- */
-@property (nonatomic, assign) SCCameraType cameraType;
 /**
  * The mode of focus for the current camera
  */

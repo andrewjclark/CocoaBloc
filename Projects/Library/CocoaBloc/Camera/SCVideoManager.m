@@ -7,269 +7,179 @@
 //
 
 #import "SCVideoManager.h"
-
-BOOL CGAffineTransformIsPortrait(CGAffineTransform transtorm) {
-    return (transtorm.a == 0 && transtorm.d == 0 && (transtorm.b == 1 || transtorm.b == -1) && (transtorm.c == 1 || transtorm.c == -1));
-}
+#import "SBMovieWriter.h"
+#import <ReactiveCocoa/RACEXTScope.h>
 
 @interface SCVideoManager () <AVCaptureFileOutputRecordingDelegate>
-/**
- * The movie files that combined will create a stitched video
- */
-@property (nonatomic, strong) NSMutableArray *stitches;
-@property (nonatomic, readonly) NSArray *compositions;
+
+@property (nonatomic, readonly) NSDictionary *sizesForSessionPreset;
+@property (nonatomic, readonly) CGSize videoSize;
+
+@property (nonatomic, strong, readonly) ALAssetsLibrary *assetLibrary;
+
 @end
 
 @implementation SCVideoManager
 
-- (id)initWithCaptureSession:(AVCaptureSession *)session
-{
-    self = [super initWithCaptureSession:session];
-    if (self) {
-        self.stitches = [NSMutableArray arrayWithCapacity:0];
-        self.resetsOnOverflow = YES;
-        self.maxVideoDuration = CMTimeMakeWithSeconds(10, 600);
+@synthesize videoSize = _videoSize, assetLibrary = _assetLibrary;
+
+- (ALAssetsLibrary*) assetLibrary {
+    if (!_assetLibrary)
+        _assetLibrary = [[ALAssetsLibrary alloc] init];
+    return _assetLibrary;
+}
+
+- (void) setVideoCamera:(GPUImageVideoCamera *)videoCamera movieWriter:(SBMovieWriter*)writer {
+    if (_videoCamera == videoCamera && _movieWriter == writer)
+        return; //do nothing
+    
+    [_videoCamera stopCameraCapture];
+    GPUImageView *imageView = [self.delegate videoManagerNeedsGPUImageView:self];
+    [_videoCamera removeTarget:imageView];
+    [_videoCamera removeTarget:_movieWriter];
+    if (_videoCamera != videoCamera) {
+        [self willChangeValueForKey:@"videoCamera"];
+        _videoCamera = videoCamera;
+        [self didChangeValueForKey:@"videoCamera"];
+    }
+    if (_movieWriter != writer) {
+        [self willChangeValueForKey:@"movieWriter"];
+        _movieWriter = writer;
+        [self didChangeValueForKey:@"movieWriter"];
+    }
+    [_videoCamera addTarget:_movieWriter];
+    [_videoCamera addTarget:imageView];
+    [_videoCamera startCameraCapture];
+    _videoCamera.audioEncodingTarget = _movieWriter;
+}
+
+- (void) setVideoCamera:(GPUImageVideoCamera *)videoCamera {
+    [self setVideoCamera:videoCamera movieWriter:self.movieWriter];
+}
+- (void) setMovieWriter:(SBMovieWriter *)movieWriter {
+    [self setVideoCamera:self.videoCamera movieWriter:movieWriter];
+}
+
+- (void) setCaptureSessionPreset:(NSString *)captureSessionPreset {
+    [self willChangeValueForKey:@"captureSessionPreset"];
+    _captureSessionPreset = [captureSessionPreset copy];
+    [self didChangeValueForKey:@"captureSessionPreset"];
+    self.videoCamera.captureSessionPreset = captureSessionPreset;
+    
+    //adjust video size (if needed)
+    CGSize newVideoSize = [((NSValue*)[self.sizesForSessionPreset objectForKey:captureSessionPreset]) CGSizeValue];
+    if (!CGSizeEqualToSize(_videoSize, CGSizeZero) && CGSizeEqualToSize(newVideoSize, _videoSize))
+        return;
+    
+    [self willChangeValueForKey:@"videoSize"];
+    _videoSize = newVideoSize;
+    [self didChangeValueForKey:@"videoSize"];
+    
+    self.movieWriter = [[SBMovieWriter alloc] initWithMovieURL:self.ouputURL size:self.videoSize];
+}
+
+- (void) setCapturePosition:(AVCaptureDevicePosition)capturePosition {
+    [self willChangeValueForKey:@"capturePosition"];
+    _capturePosition = capturePosition;
+    [self didChangeValueForKey:@"capturePosition"];
+
+    self.videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:_capturePosition];
+}
+
+- (void) loadBestCaptureSessionPreset {
+    if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
+        self.captureSessionPreset = AVCaptureSessionPreset1920x1080;
+    } else if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
+        self.captureSessionPreset = AVCaptureSessionPreset1280x720;
+    } else if ([self.videoCamera.captureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
+        self.captureSessionPreset = AVCaptureSessionPreset640x480;
+    } else if ([self.videoCamera .captureSession canSetSessionPreset:AVCaptureSessionPreset352x288]) {
+        self.captureSessionPreset = AVCaptureSessionPreset352x288;
+    } else {
+        NSLog(@"Cannot set any session preset");
+    }
+}
+
+- (id)initWithMovieOutputURL:(NSURL*)ouputURL delegate:(id<SCVideManagerDelegate>)delegate {
+    if (self = [super init]) {
+        _sizesForSessionPreset = @{AVCaptureSessionPreset1920x1080 : [NSValue valueWithCGSize:CGSizeMake(1920, 1080)],
+                                   AVCaptureSessionPreset1280x720 : [NSValue valueWithCGSize:CGSizeMake(1280, 720)],
+                                   AVCaptureSessionPreset640x480 : [NSValue valueWithCGSize:CGSizeMake(640, 480)],
+                                   AVCaptureSessionPreset352x288 : [NSValue valueWithCGSize:CGSizeMake(352, 288)]};
+        _delegate = delegate;
+        _captureSessionPreset = AVCaptureSessionPresetHigh;
+        _ouputURL = [ouputURL copy];
+        _videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:AVCaptureDevicePositionBack];
+        [self loadBestCaptureSessionPreset];
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(orientationChange:)
+                                                     name:UIApplicationDidChangeStatusBarOrientationNotification
+                                                   object:nil];
     }
     return self;
 }
 
-- (AVCaptureDevice *)microphone
-{
-    return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
-}
-
-- (void)setTorchMode:(AVCaptureTorchMode)torchMode
-{
-    NSError *error = nil;
-    [self.currentCamera lockForConfiguration:&error];
-    if (error) {
-        // Appropriately handle error here
-    } else {
-        if ([self isTorchModeSupported:torchMode]) {
-            self.currentCamera.torchMode = torchMode;
-        }
-        [self.currentCamera unlockForConfiguration];
-    }
-}
-
-- (BOOL)isTorchAvailable
-{
-    return self.currentCamera.isTorchAvailable;
-}
-
-- (BOOL)isTorchActive
-{
-    return self.currentCamera.isTorchActive;
-}
-
-- (BOOL)isTorchModeSupported:(AVCaptureTorchMode)torchMode
-{
-    return [self.currentCamera isTorchModeSupported:torchMode];
-}
-
-- (void)resetRecordings
-{
-    for (NSURL *outputFileURL in self.stitches) {
-        NSFileManager *fm = [NSFileManager defaultManager];
-        NSError *error = nil;
-        [fm removeItemAtURL:outputFileURL error:&error];
-        if (error) {
-            // Handle error here
-        }
-    }
-    [self.stitches removeAllObjects];
-}
-
-- (NSUInteger)currentStitchCount
-{
-    return self.stitches.count;
-}
-
-- (void)setFPS:(CMTime)FPS
-{
-    [self willChangeValueForKey:@"FPS"];
-    _FPS = FPS;
-    [self didChangeValueForKey:@"FPS"];
-    NSError *error = nil;
-    [self.currentCamera lockForConfiguration:&error];
-    if (error) {
-        // Handle error here
-    } else {
-        self.rearCamera.activeVideoMinFrameDuration = _FPS;
-        self.frontFacingCamera.activeVideoMinFrameDuration = _FPS;
-        [self.currentCamera unlockForConfiguration];
-    }
-}
-
-#pragma mark - Override
-- (void)setCameraType:(SCCameraType)cameraType
-{
-    [super setCameraType:cameraType];
-
-    NSError *error = nil;
-    [self.captureSession beginConfiguration];
-    if (!self.micInput || ![self.captureSession.inputs containsObject:self.micInput]) {
-        self.micInput = [AVCaptureDeviceInput deviceInputWithDevice:self.microphone error:&error];
-        if ([self.captureSession canAddInput:self.micInput]) {
-            [self.captureSession addInput:self.micInput];
-        }
-    }
-    if (!self.output || ![self.captureSession.outputs containsObject:self.output]) {
-        self.output = [AVCaptureMovieFileOutput new];
-        if ([self.captureSession canAddOutput:self.output]) {
-            [self.captureSession addOutput:self.output];
-        }
-    }
-    [self.captureSession commitConfiguration];
-}
-
-// Returns no if we've already returned the maximum amount of stitches
-- (BOOL)startCapture
-{
-    if (self.maximumStitchCount > 0 && self.currentStitchCount == self.maximumStitchCount) { // if we've reached our max stitch count
-        if (self.resetsOnOverflow) { // if we reset on overflow
-            [self resetRecordings]; // reset our recordings
-            return [self startCapture]; // and start our capture again
-        }
-        return NO; // else we just want to return a failed capture
-    }
-    // enable URL
-    self.output.maxRecordedDuration = self.maxVideoDuration;
-    AVCaptureConnection *connection = [self.output connectionWithMediaType:AVMediaTypeVideo];
-    connection.videoOrientation = AVCaptureVideoOrientationPortrait;
+- (void)startRecording {
+    //add targets if they don't exist already
+    if (!self.videoCamera.audioEncodingTarget)
+        self.videoCamera.audioEncodingTarget = self.movieWriter;
     
-    NSString *URLString = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%d.mov", (NSInteger)[[NSDate date] timeIntervalSince1970]]];
-    NSURL *outputURL = [NSURL fileURLWithPath:URLString];
-    [self.output startRecordingToOutputFileURL:outputURL recordingDelegate:self];
-    return YES;
-}
-
-// Returns an NSURL iff we've hit the max stitch limit, or max duration
-- (void)stopCapture {
-    if (self.captureSession.outputs.count > 0) {
-        [self.output stopRecording];
-    }
-}
-
-- (NSURL *)outputURL
-{
-    // return a stitched video from the temp cache
-    NSArray *comps = self.compositions;
-    return self.stitches.count > 0 ? [self exportVideoFromComposition:comps[0] withVideoComposition:comps[1] completion:nil] : nil;
-}
-
-- (BOOL) saveVideoLocally:(void (^)(NSURL *assetURL, NSError *error))completion {
-    if (self.stitches.count == 0)
-        return NO;
-    NSArray *comps = self.compositions;
-    [self exportVideoFromComposition:comps[0] withVideoComposition:comps[1] completion:completion];
-    return YES;
-}
-
-#pragma mark - AVCaptureFileOutputRecordingDelegate
-
-- (void)captureOutput:(AVCaptureFileOutput *)captureOutput didStartRecordingToOutputFileAtURL:(NSURL *)fileURL fromConnections:(NSArray *)connections
-{
-    [self.stitches addObject:captureOutput.outputFileURL];
-}
-
-- (void)captureOutput:(AVCaptureFileOutput *)captureOutput didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL fromConnections:(NSArray *)connections error:(NSError *)error
-{
-    if (error) {
-        [self.stitches removeObject:captureOutput.outputFileURL];
-    } else {
-        [self.captureSession beginConfiguration];
-        [self.captureSession removeOutput:self.stitches.lastObject];
-        [self.captureSession commitConfiguration];
+    //resumes recording
+    if (self.movieWriter.isPaused) {
+        self.movieWriter.paused = NO;
     }
     
-    if (self.captureOutputFinishedProcessing)
-        self.captureOutputFinishedProcessing(captureOutput, outputFileURL, connections, error);
-}
-
-#pragma mark - Helpers
-
-- (NSArray *)compositions
-{
-    AVMutableComposition *composition = [AVMutableComposition composition];
-    AVMutableVideoComposition *videoComposition = [AVMutableVideoComposition videoComposition];
-    AVMutableCompositionTrack *videoCompositionTrack = [composition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
-    AVMutableCompositionTrack *audioCompositionTrack = [composition addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
-    for (NSURL *URL in self.stitches) {
-        AVURLAsset *asset = [AVURLAsset URLAssetWithURL:URL options:@{AVURLAssetPreferPreciseDurationAndTimingKey : @YES}];
-        AVAssetTrack *videoTrack = [asset compatibleTrackForCompositionTrack:videoCompositionTrack];
-        NSError *videoError = nil;
-        [videoCompositionTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, videoTrack.timeRange.duration) ofTrack:videoTrack atTime:videoCompositionTrack.timeRange.duration error:&videoError];
-        if (videoError) {
-            // Handle error here
-            NSLog(@"currentComposition :: videoError :: %@", videoError);
-            return nil;
-        } else {
-            if (!CGAffineTransformIsPortrait(asset.preferredTransform)) {
-                AVMutableVideoCompositionInstruction *instruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
-                AVMutableVideoCompositionLayerInstruction *layerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
-                CGAffineTransform transform = CGAffineTransformRotate(CGAffineTransformMakeTranslation(videoTrack.naturalSize.height, 0.f), M_PI_2);
-                [layerInstruction setTransform:transform atTime:kCMTimeZero];
-                instruction.timeRange = CMTimeRangeMake(CMTimeSubtract(videoCompositionTrack.timeRange.duration, videoTrack.timeRange.duration), videoTrack.timeRange.duration);
-                instruction.layerInstructions = instruction.layerInstructions.count == 0 ? @[layerInstruction] : [instruction.layerInstructions arrayByAddingObject:layerInstruction];
-                videoComposition.renderSize = CGSizeMake(fabsf(videoTrack.naturalSize.height), fabsf(videoTrack.naturalSize.width));
-                videoComposition.frameDuration = CMTimeMake(1, 30);
-                videoComposition.instructions = videoComposition.instructions.count > 0 ? [videoComposition.instructions arrayByAddingObject:instruction] : @[instruction];
-            }
-        }
-        AVAssetTrack *audioTrack = [asset compatibleTrackForCompositionTrack:audioCompositionTrack];
-        NSError *audioError = nil;
-        [audioCompositionTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, audioTrack.timeRange.duration) ofTrack:audioTrack atTime:audioCompositionTrack.timeRange.duration error:&audioError];
-        if (audioError) {
-            // Handle error here
-            NSLog(@"currentComposition :: audioError :: %@", audioError);
-        }
+    //starts recording
+    else {
+        [self.movieWriter startRecording];
     }
-    return @[composition, videoComposition];
 }
 
-- (NSURL *)exportVideoFromComposition:(AVComposition *)composition withVideoComposition:(AVVideoComposition *)videoComposition completion:(void (^)(NSURL *assetURL, NSError *error))completion
-{
-    NSString *URLString = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%d.mov", (NSInteger)[[NSDate date] timeIntervalSince1970]]];
-    NSURL *outputURL = [NSURL fileURLWithPath:URLString];
-    AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:composition presetName:AVAssetExportPresetHighestQuality];
-    exporter.outputURL = outputURL;
-    exporter.outputFileType = AVFileTypeQuickTimeMovie;
-    exporter.shouldOptimizeForNetworkUse = YES;
-    exporter.videoComposition = videoComposition;
-    [exporter exportAsynchronouslyWithCompletionHandler:^{
-        if (exporter.status == AVAssetExportSessionStatusCompleted) {
-            ALAssetsLibrary *library = [ALAssetsLibrary new];
-            if ([library videoAtPathIsCompatibleWithSavedPhotosAlbum:exporter.outputURL]) {
-                [library writeVideoAtPathToSavedPhotosAlbum:exporter.outputURL completionBlock:^(NSURL *assetURL, NSError *error) {
-                    if (error) {
-                        NSLog(@"exportVideoFromComposition :: error :: %@", error);
-                    } else {
-                        NSLog(@"Wrote to library successfully");
-                    }
-                    
-                    if (completion)
-                        completion(assetURL, error);
-                }];
-            } else {
-                if (completion)
-                    completion(nil, [NSError errorWithDomain:@"exportVideo" code:500 userInfo:@{@"error":@"Incompatible video"}]);
+- (void)pauseRecording {
+    self.movieWriter.paused = YES;
+}
 
-                NSLog(@"Incompatible video");
-            }
-        } else {
-            // Handle other statuses here
-            NSLog(@"exportVideoFromComposition :: otherStatus :: %ld :: %@", (long)exporter.status, exporter.error);
-        }
+- (void)stopRecording {
+    [self stopRecordingWithCompletion:nil];
+}
+
+- (void)stopRecordingWithCompletion:(void (^)(NSURL *fileURL))completion {
+    @weakify(self);
+    [self.movieWriter finishRecordingWithCompletionHandler:^{
+        @strongify(self);
+        self.videoCamera.audioEncodingTarget = nil;
+        if (completion)
+            completion(self.ouputURL);
     }];
-    return outputURL;
 }
 
--(void)exportMedia
-{
-
+- (void) saveVideoAtPath:(NSURL*)path toLibraryWithCompletion:(ALAssetsLibraryWriteVideoCompletionBlock)completion {
+    [self.assetLibrary writeVideoAtPathToSavedPhotosAlbum:path completionBlock:completion];
 }
 
-
+#pragma mark - Orientation Change
+- (void)orientationChange:(NSNotification *)notificacion {
+    UIInterfaceOrientation toOrientation = [[[notificacion userInfo]
+                                             objectForKey:UIApplicationStatusBarOrientationUserInfoKey] integerValue];
+    switch (toOrientation) {
+        case UIDeviceOrientationLandscapeLeft:
+            self.videoCamera.outputImageOrientation = UIInterfaceOrientationLandscapeLeft;
+            break;
+            
+        case UIDeviceOrientationLandscapeRight:
+            self.videoCamera.outputImageOrientation = UIInterfaceOrientationLandscapeRight;
+            break;
+            
+        case UIDeviceOrientationPortrait:
+            self.videoCamera.outputImageOrientation = UIInterfaceOrientationPortrait;
+            break;
+            
+        case UIDeviceOrientationPortraitUpsideDown:
+            self.videoCamera.outputImageOrientation = UIInterfaceOrientationPortraitUpsideDown;
+            break;
+        default: break; //stay the same
+    }
+}
 
 @end

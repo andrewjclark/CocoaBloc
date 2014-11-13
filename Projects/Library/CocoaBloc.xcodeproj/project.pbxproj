@@ -71,6 +71,7 @@
 		4D224DEF1A0919B6007DF1D1 /* SCReviewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D224DDE1A0919B6007DF1D1 /* SCReviewController.m */; };
 		4D224DF01A0919B6007DF1D1 /* SCVideoManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D224DE01A0919B6007DF1D1 /* SCVideoManager.m */; };
 		4D22AA0C1A08190000B3C073 /* UIDevice+StageBloc.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D22AA0B1A08190000B3C073 /* UIDevice+StageBloc.m */; };
+		4D5B8C881A1500CD00EE0D76 /* SBMovieWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D5B8C871A1500CD00EE0D76 /* SBMovieWriter.m */; };
 		4D8363201A0B0E1F00A820B5 /* SCRecordButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 4D83631F1A0B0E1F00A820B5 /* SCRecordButton.m */; };
 		4DF6EFE21A099F1600A5CFEC /* SCCameraView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DF6EFE11A099F1600A5CFEC /* SCCameraView.m */; };
 		603E62993CFD4616B45E54A9 /* libPods-CocoaBlocTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 94149DFDF832406188025E96 /* libPods-CocoaBlocTests.a */; };
@@ -233,6 +234,8 @@
 		4D224DE01A0919B6007DF1D1 /* SCVideoManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SCVideoManager.m; sourceTree = "<group>"; };
 		4D22AA0A1A08190000B3C073 /* UIDevice+StageBloc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIDevice+StageBloc.h"; sourceTree = "<group>"; };
 		4D22AA0B1A08190000B3C073 /* UIDevice+StageBloc.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIDevice+StageBloc.m"; sourceTree = "<group>"; };
+		4D5B8C861A1500CD00EE0D76 /* SBMovieWriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SBMovieWriter.h; sourceTree = "<group>"; };
+		4D5B8C871A1500CD00EE0D76 /* SBMovieWriter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SBMovieWriter.m; sourceTree = "<group>"; };
 		4D83631E1A0B0E1F00A820B5 /* SCRecordButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCRecordButton.h; sourceTree = "<group>"; };
 		4D83631F1A0B0E1F00A820B5 /* SCRecordButton.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SCRecordButton.m; sourceTree = "<group>"; };
 		4DF6EFE01A099F1600A5CFEC /* SCCameraView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCCameraView.h; sourceTree = "<group>"; };
@@ -543,6 +546,7 @@
 		4D224DBF1A0919B6007DF1D1 /* Camera */ = {
 			isa = PBXGroup;
 			children = (
+				4D5B8C851A1500B200EE0D76 /* GPUImage */,
 				4D224DF31A091AC5007DF1D1 /* Assets */,
 				4D224DF51A091AF0007DF1D1 /* Capture */,
 				4D224DF11A091ABC007DF1D1 /* Controllers */,
@@ -616,6 +620,15 @@
 				4D224DE01A0919B6007DF1D1 /* SCVideoManager.m */,
 			);
 			name = Capture;
+			sourceTree = "<group>";
+		};
+		4D5B8C851A1500B200EE0D76 /* GPUImage */ = {
+			isa = PBXGroup;
+			children = (
+				4D5B8C861A1500CD00EE0D76 /* SBMovieWriter.h */,
+				4D5B8C871A1500CD00EE0D76 /* SBMovieWriter.m */,
+			);
+			name = GPUImage;
 			sourceTree = "<group>";
 		};
 		87FBAF30143597866B1808B6 /* Pods */ = {
@@ -895,6 +908,7 @@
 				4D8363201A0B0E1F00A820B5 /* SCRecordButton.m in Sources */,
 				0976370E19BE3F8200E3CD45 /* SBClient+Status.m in Sources */,
 				094D917A19E44CCB00254DD8 /* RACSignal+JSONDeserialization.m in Sources */,
+				4D5B8C881A1500CD00EE0D76 /* SBMovieWriter.m in Sources */,
 				090A7BA319BF590D00AB0427 /* NSObject+AssociatedObjects.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
