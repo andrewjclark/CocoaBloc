@@ -35,6 +35,10 @@
 */
 - (void)startRecording;
 /**
+ * Resumes an output session
+ */
+- (void)pauseRecording;
+/**
  * Stops an output session
 */
 - (void)stopRecording;

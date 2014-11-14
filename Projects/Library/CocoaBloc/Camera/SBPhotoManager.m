@@ -24,10 +24,10 @@
 - (instancetype) initWithImageView:(GPUImageView *)imageView {
     if (self = [super initWithImageView:imageView]) {
         _camera = [[GPUImageStillCamera alloc] initWithSessionPreset:AVCaptureSessionPresetPhoto cameraPosition:AVCaptureDevicePositionBack];
+        _camera.outputImageOrientation = [UIDevice currentDevice].orientation;
         _filter = [[GPUImageGammaFilter alloc] init];
         [_camera addTarget:_filter];
         [_filter addTarget:imageView];
-        [_camera startCameraCapture];
     }
     return self;
 }

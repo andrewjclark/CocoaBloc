@@ -15,14 +15,23 @@ typedef NS_ENUM(NSUInteger, SBCaptureType) {
     SBCaptureTypeVideo = 1,
 };
 
+typedef NS_ENUM(NSUInteger, SBCaptureFlashMode) {
+    SBCaptureFlashModeOff = 0, //AVCaptureFlashModeOff & AVCaptureTorchModeOff
+    SBCaptureFlashModeOn = 1, //AVCaptureFlashModeOn & AVCaptureTorchOn
+    SBCaptureFlashModeAuto = 2, //AVCaptureFlashModeAuto & AVCaptureTorchModeAuto
+};
+
 @interface SBCaptureManager : NSObject
 
-@property (nonatomic, readonly) SBVideoManager *videoManager;
-@property (nonatomic, readonly) SBPhotoManager *photoManager;
+@property (nonatomic, strong, readonly) SBVideoManager *videoManager;
+@property (nonatomic, strong, readonly) SBPhotoManager *photoManager;
 
 @property (nonatomic, assign) SBCaptureType captureType;
+@property (nonatomic, assign, readonly) SBCaptureFlashMode flashMode;
 
-- (instancetype) initWithVideoManager:(SBVideoManager)videoManager photoManager:(SBPhotoManager*)photoManager;
+- (instancetype) initWithVideoManager:(SBVideoManager*)videoManager photoManager:(SBPhotoManager*)photoManager;
+
+- (void) setVideoManager:(SBVideoManager *)videoManager photoManager:(SBPhotoManager*)photoManager;
 
 - (SBDeviceManager*) currentManager;
 

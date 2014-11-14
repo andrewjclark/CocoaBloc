@@ -10,7 +10,7 @@
 #import "SBMovieWriter.h"
 #import <ReactiveCocoa/RACEXTScope.h>
 
-@interface SBVideoManager () <AVCaptureFileOutputRecordingDelegate>
+@interface SBVideoManager ()
 
 @property (nonatomic, readonly) NSDictionary *sizesForSessionPreset;
 @property (nonatomic, readonly) CGSize videoSize;
@@ -52,8 +52,10 @@
     }
     [_camera addTarget:_movieWriter];
     [_camera addTarget:self.imageView];
-    [_camera startCameraCapture];
-    _camera.audioEncodingTarget = _movieWriter;
+    
+    //not the best idea but works for now since we know
+    //SBMovieWriter has same methods as GPUImageMovieWriter
+    _camera.audioEncodingTarget = (GPUImageMovieWriter*)_movieWriter;
 }
 
 - (void) setCamera:(GPUImageVideoCamera*)camera {
@@ -112,6 +114,7 @@
         _captureSessionPreset = AVCaptureSessionPresetHigh;
         _ouputURL = [url copy];
         _camera = [[GPUImageVideoCamera alloc] initWithSessionPreset:_captureSessionPreset cameraPosition:AVCaptureDevicePositionBack];
+        _camera.outputImageOrientation = [UIDevice currentDevice].orientation;
         [self loadBestCaptureSessionPreset];
     }
     return self;
@@ -119,8 +122,11 @@
 
 - (void)startRecording {
     //add targets if they don't exist already
-    if (!self.camera.audioEncodingTarget)
-        self.camera.audioEncodingTarget = self.movieWriter;
+    if (!self.camera.audioEncodingTarget) {
+        //not the best idea but works for now since we know
+        //SBMovieWriter has same methods as GPUImageMovieWriter
+        self.camera.audioEncodingTarget = (GPUImageMovieWriter*) self.movieWriter;
+    }
     
     //resumes recording
     if (self.movieWriter.isPaused) {

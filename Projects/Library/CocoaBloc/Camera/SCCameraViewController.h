@@ -7,6 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "SBCaptureManager.h"
 
 @class SCCameraViewController;
 

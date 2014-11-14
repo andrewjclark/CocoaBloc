@@ -11,9 +11,9 @@
 
 @class SBPhotoManager;
 
-typedef NS_ENUM(NSUInteger, SCCameraAspectRatio) {
-    SCCameraAspectRatio1_1 = 0,
-    SCCameraAspectRatio4_3 = 1,
+typedef NS_ENUM(NSUInteger, SBCameraAspectRatio) {
+    SBCameraAspectRatio1_1 = 0,
+    SBCameraAspectRatio4_3 = 1,
 };
 
 typedef NS_ENUM(NSUInteger, SBCameraPhotoFileType) {
@@ -28,7 +28,7 @@ typedef NS_ENUM(NSUInteger, SBCameraPhotoFileType) {
 /**
  * Checks whether image output should be 1:1 (square mode) or 4:3 (portrait mode)
  */
-@property (nonatomic, assign) SCCameraAspectRatio aspectRatio;
+@property (nonatomic, assign) SBCameraAspectRatio aspectRatio;
 
 /**
  * Captures still image

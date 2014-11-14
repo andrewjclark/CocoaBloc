@@ -12,22 +12,10 @@
  */
 
 #import <UIKit/UIKit.h>
+#import <GPUImage/GPUImage.h>
 
 @import AVFoundation.AVCaptureSession;
 
-@interface SCCaptureView : UIView
-
-@property (nonatomic, readonly) AVCaptureSession *captureSession;
-
-- (id)initWithCaptureSession:(AVCaptureSession *)session;
-
-- (void) addSessionIfNeeded:(AVCaptureSession*)session;
-
-/*
- REQUIRED - must call when no longer using
- an instance of this view. Session is retained
- by layer, must remove.
- */
-- (void) removeSession;
+@interface SCCaptureView : GPUImageView
 
 @end

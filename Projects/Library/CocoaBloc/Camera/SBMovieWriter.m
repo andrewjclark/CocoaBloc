@@ -11,19 +11,6 @@
 #import <GPUImage/GLProgram.h>
 #import <GPUImage/GPUImageFilter.h>
 
-NSString *const kGPUImageColorSwizzlingFragmentShaderString = SHADER_STRING
-(
- varying highp vec2 textureCoordinate;
- 
- uniform sampler2D inputImageTexture;
- 
- void main()
- {
-     gl_FragColor = texture2D(inputImageTexture, textureCoordinate).bgra;
- }
-);
-
-
 @interface SBMovieWriter ()
 {
     GLuint movieFramebuffer, movieRenderbuffer;
