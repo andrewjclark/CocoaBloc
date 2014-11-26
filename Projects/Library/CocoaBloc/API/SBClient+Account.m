@@ -48,10 +48,13 @@
                 }];        	
 }
 
-//- (RACSignal *)getChildrenAccountsForAccount:(SBAccount *)account {
-//    NSParameterAssert(account);
-//    
-//    return [[self rac_GET:[NSString stringWithFormat:] parameters:]]
-//}
+- (RACSignal *)getChildrenAccountsForAccount:(SBAccount *)account {
+    NSParameterAssert(account);
+    
+    return [[self rac_GET:[NSString stringWithFormat:@"account/%@/children", account.identifier] parameters:[self requestParametersWithParameters:nil]]
+            map:^id(NSDictionary *response) {
+                return response;
+            }];
+}
 
 @end
